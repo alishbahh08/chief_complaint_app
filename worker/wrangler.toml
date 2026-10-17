@@ -1,0 +1,7 @@
+﻿name = "chief-complaint-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "cheif-complaint"
+GROQ_MODEL = "openai/gpt-oss-120b"

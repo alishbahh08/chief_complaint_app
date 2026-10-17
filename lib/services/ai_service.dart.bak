@@ -1,0 +1,66 @@
+import 'package:cloud_functions/cloud_functions.dart';
+
+import '../models/case_model.dart';
+import '../models/chat_message.dart';
+import '../models/case_progress.dart';
+import '../models/mcq_model.dart';
+
+/// Every AI call goes through a Cloud Function (see /functions/index.js) —
+/// never straight to the Anthropic API from the app, so the API key is
+/// never shipped to a device. See Module: Backend AI functions.
+class AiService {
+  final _functions = FirebaseFunctions.instance;
+
+  Future<String> patientReply({required CaseModel c, required List<ChatMessage> history}) async {
+    final callable = _functions.httpsCallable('patientReply');
+    final result = await callable.call({
+      'patient': {
+        'name': c.patientName,
+        'age': c.patientAge,
+        'gender': c.patientGender,
+        'occupation': c.patientOccupation,
+        'informant': c.informant,
+      },
+      'facts': c.facts,
+      'history': history
+          .where((m) => m.role != ChatRole.system)
+          .map((m) => {'role': m.role.name, 'text': m.text})
+          .toList(),
+    });
+    return (result.data as Map)['reply'] as String;
+  }
+
+  Future<GradeResult> gradeCase({
+    required CaseModel c,
+    required List<ChatMessage> history,
+    required String diagnosis,
+    required String prescription,
+  }) async {
+    final callable = _functions.httpsCallable('gradeCase');
+    final result = await callable.call({
+      'idealDiagnosis': c.idealDiagnosis,
+      'idealManagement': c.idealManagement,
+      'transcript': history.where((m) => m.role != ChatRole.system).map((m) => '${m.role.name}: ${m.text}').join('\n'),
+      'diagnosis': diagnosis,
+      'prescription': prescription,
+    });
+    return GradeResult.fromJson(Map<String, dynamic>.from(result.data));
+  }
+
+  Future<String> mcqFollowup({
+    required McqModel m,
+    required List<ChatMessage> chat,
+    required String question,
+  }) async {
+    final callable = _functions.httpsCallable('mcqFollowup');
+    final result = await callable.call({
+      'question': m.question,
+      'options': m.options,
+      'correctIndex': m.correctIndex,
+      'explanation': m.explanation,
+      'priorChat': chat.map((c) => {'role': c.role.name, 'text': c.text}).toList(),
+      'newQuestion': question,
+    });
+    return (result.data as Map)['reply'] as String;
+  }
+}

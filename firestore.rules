@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // A user can only ever read/write their own data
+    // (progress, quiz attempts, cases, mcqs, mock tests, activity...).
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Share codes: anyone signed in can open a share by its exact code,
+    // but nobody can list/browse them. Only the owner can edit or delete.
+    match /shared/{code} {
+      allow get: if request.auth != null;
+      allow list: if false;
+      allow create: if request.auth != null
+                    && request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if request.auth != null
+                    && resource.data.ownerUid == request.auth.uid;
+    }
+  }
+}
